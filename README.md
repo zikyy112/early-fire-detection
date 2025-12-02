@@ -1,6 +1,9 @@
-# :earth_americas: GDP dashboard template
+# Early fire detection with drone
 
-A simple Streamlit app showing the GDP of different countries in the world.
+An overview of 3 main coordinates and their activity. 
+
+If a fire is detected, red appears.
+
 
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://gdp-dashboard-template.streamlit.app/)
 
