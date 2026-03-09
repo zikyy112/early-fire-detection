@@ -1,6 +1,6 @@
-{
-    "battery": 100,
-    "current_point": 0,
-    "fire_detected": false,
-    "command": "NONE"
-}
+{'battery': 100,
+ 'current_point': 0,
+ 'drone_lat': 48.9105,
+ 'drone_lon': 2.1023,
+ 'alerts': [],
+ 'command': 'NONE'}
