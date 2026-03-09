@@ -130,4 +130,4 @@ st.title("Forest of St-Germain")
 
 #auto-refresh (Optionnal: force le rechargement toutes les 5s)
 time.sleep(5)
-st.rerun())
+st.rerun()
