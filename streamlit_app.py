@@ -9,15 +9,14 @@ DATA_FILE = "data.json"
 
 def load_data_safe():
     """read data.json but with a try/except to avoid crash between write and reading"""
-    print(f"DEBUG : Le fichier sera ici -> {os.path.abspath(DATA_FILE)}")
     try:
         if os.path.exists(DATA_FILE):
             with open(DATA_FILE, "r") as f:
                 return json.load(f)
         else:
             #if not exist
-            default_data = {"battery": 100, "current_point": 0, "fire_detected": False, "command": "NONE" }
-            with open(DATA_FILE, "w") as f:
+            default_data = {"battery": 100, "current_point": 0, "drone_lat": 48.9105, "drone_lon": 2.1023,"alerts": [], "command": "NONE" }
+            with open(DATA_FILE, "w") as f: 
                 json.dump(default_data, f, indent=4)
             return default_data
     except Exception:
@@ -45,8 +44,6 @@ st.title(":fire: DRONE MONITORING")
 
 #visual of actual page 
 '''
-# :fire: DRONE FOR EARLY FIRE DETECTION
-
 Project made in the frame of an Aerospace Track. 
 With the global warming of the Earth, more and more fire occurs in the forest. This crucial events have many impacts on biodiversity, that is why we need to prevent it. 
 Our project consists in a embedded drone which sends update when a start of fire is detected. 
@@ -75,29 +72,32 @@ with st.sidebar:
     
     if st.button(":video_game: TAKE CONTROL"):
         save_command("HOLD")
-        st.warning("autonomous flight stoped")
+        st.warning("autonomous flight stopped")
 
     st.divider() 
     
-    st.subheader("State of the drone:")
-    
-    
+
+st.subheader("State of the drone:")
     
 @st.fragment(run_every="2s")
 def update_dynamic_content():
     data = load_data_safe()
     
     if data:
-        cols = st.columns(3)
+        cols = st.columns(4)
         cols[0].metric("Battery level: ", f"{data['battery']}%")
-        cols[1].info(f"Status: {data['status']}")
+        cols[1].info(f"Current command: {data['command']}")
         
         #visual if fire detected
         if data["alerts"]:
-            cols[2].error(f":warning: FIRE DETECTED (points: {data['alerts']})")
+            points_str = ", ".join(map(str, data["alerts"]))
+            cols[2].error(f":warning: FIRE DETECTED (points: {points_str})")
         else:
             cols[2].success("No alert")
 
+        cols[3].info(f"Coordinates: {data['drone_lat']}; {data['drone_lon']}")
+        
+        
         #update map
         df = pd.DataFrame(fixed_points)
         #red: alert, else blue or green
@@ -107,7 +107,20 @@ def update_dynamic_content():
 
         view_state = pdk.ViewState(latitude=48.9150, longitude=2.1000, zoom=12, pitch=45)
         
-        layer = pdk.Layer(
+        drone_data = pd.DataFrame([{
+            "lat": data["drone_lat"], 
+            "lon": data["drone_lon"], 
+            "name": "DRONE"
+        }])
+        drone_layer = pdk.Layer(
+            'ScatterplotLayer',
+            drone_data,
+            get_position='[lon, lat]',
+            get_color='[255, 255, 0, 255]', 
+            get_radius=150,
+        )
+        
+        point_layer = pdk.Layer(
             'ScatterplotLayer',
             df,
             get_position='[lon, lat]',
@@ -115,17 +128,16 @@ def update_dynamic_content():
             get_radius=250,
             pickable=True
         )
-
         st.pydeck_chart(pdk.Deck(
             map_style='mapbox://styles/mapbox/light-v9',
+            layers=[point_layer, drone_layer], # Couche points + Couche drone
             initial_view_state=view_state,
-            layers=[layer],
             tooltip={"text": "{name}"}
         ))
 
 
+
 update_dynamic_content()
-st.title("Forest of St-Germain")
 
 
 #auto-refresh (Optionnal: force le rechargement toutes les 5s)
