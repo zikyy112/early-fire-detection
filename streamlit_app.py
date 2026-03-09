@@ -129,8 +129,8 @@ def update_dynamic_content():
             pickable=True
         )
         st.pydeck_chart(pdk.Deck(
-            map_style='mapbox://styles/mapbox/light-v9',
-            layers=[point_layer, drone_layer], # Couche points + Couche drone
+            map_style=None,
+            layers=[point_layer, drone_layer], 
             initial_view_state=view_state,
             tooltip={"text": "{name}"}
         ))
