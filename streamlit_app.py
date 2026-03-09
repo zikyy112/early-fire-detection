@@ -1,10 +1,39 @@
 import streamlit as st
 import pandas as pd
-import math
-from numpy.random import default_rng as rng
 import pydeck as pdk
-from pathlib import Path
+import time
+import json
+import os
 
+DATA_FILE = "data.json"
+
+def load_data_safe():
+    """read data.json but with a try/except to avoid crash between write and reading"""
+    print(f"DEBUG : Le fichier sera ici -> {os.path.abspath(DATA_FILE)}")
+    try:
+        if os.path.exists(DATA_FILE):
+            with open(DATA_FILE, "r") as f:
+                return json.load(f)
+        else:
+            #if not exist
+            default_data = {"battery": 100, "current_point": 0, "fire_detected": False, "command": "NONE" }
+            with open(DATA_FILE, "w") as f:
+                json.dump(default_data, f, indent=4)
+            return default_data
+    except Exception:
+        #nothing done if writing
+        pass
+    return None
+
+def save_command(cmd):
+    try:
+        data = load_data_safe()
+        data["command"] = cmd
+        with open(DATA_FILE, "w") as f:
+            json.dump(data, f, indent=4)
+    except Exception as e:
+        st.error(f"Error in the command: {e}")
+        
 
 #setting configuration of title
 st.set_page_config(
@@ -12,6 +41,7 @@ st.set_page_config(
     page_icon=':fire:', 
 )
 
+st.title(":fire: DRONE MONITORING")
 
 #visual of actual page 
 '''
@@ -31,38 +61,73 @@ fixed_points = [
     {"id": 3, "name": "Zone Nord", "lat": 48.9300, "lon": 2.0900}
 ]
 
-#connexion to the api or flux (way of receiving the alerts)
-warning_update = []
-
-
-def update_map(ids):
-    #ids: the list of the id where an alert has been detected : 1, 2 and/or 3, or empty if none
-    df = pd.DataFrame(fixed_points)
+ 
+#control buttons and info
+with st.sidebar:
+    st.header("COMMAND OF THE FLIGHT")
+    if st.button(":flight_departure: DEPARTURE"):
+        save_command("START")
+        st.success("start order sent")
     
-    #for each point, puting it in red if it has been warned
-    df['color_r'] = df['id'].apply(lambda x: 255 if x in ids else 0)
-    df['color_g'] = df['id'].apply(lambda x: 0 if x in ids else 100)
-    df['color_b'] = df['id'].apply(lambda x: 0 if x in ids else 255)
+    if st.button(":stop_sign: ABORT AND RETURN TO HOME", type="primary"):
+        save_command("ABORT")
+        st.warning("mission aborted")
+    
+    if st.button(":video_game: TAKE CONTROL"):
+        save_command("HOLD")
+        st.warning("autonomous flight stoped")
 
-    st.pydeck_chart(pdk.Deck(
-        map_style='mapbox://styles/mapbox/outdoors-v11', # Style adapté à la forêt
-        layers=[
-            pdk.Layer(
-                'ScatterplotLayer',
-                df,
-                get_position='[lon, lat]',
-                get_color='[color_r, color_g, color_b, 200]',
-                get_radius=150,
-                pickable=True
-            ),
-        ],
-        initial_view_state=pdk.ViewState(
-            latitude=48.9150, 
-            longitude=2.1000, 
-            zoom=12,
-            pitch=0)
-    ))
+    st.divider() 
+    
+    st.subheader("State of the drone:")
     
     
+    
+@st.fragment(run_every="2s")
+def update_dynamic_content():
+    data = load_data_safe()
+    
+    if data:
+        cols = st.columns(3)
+        cols[0].metric("Battery level: ", f"{data['battery']}%")
+        cols[1].info(f"Status: {data['status']}")
+        
+        #visual if fire detected
+        if data["alerts"]:
+            cols[2].error(f":warning: FIRE DETECTED (points: {data['alerts']})")
+        else:
+            cols[2].success("No alert")
+
+        #update map
+        df = pd.DataFrame(fixed_points)
+        #red: alert, else blue or green
+        df['color_r'] = df['id'].apply(lambda x: 255 if x in data["alerts"] else 0)
+        df['color_g'] = df['id'].apply(lambda x: 0 if x in data["alerts"] else 150)
+        df['color_b'] = df['id'].apply(lambda x: 0 if x in data["alerts"] else 255)
+
+        view_state = pdk.ViewState(latitude=48.9150, longitude=2.1000, zoom=12, pitch=45)
+        
+        layer = pdk.Layer(
+            'ScatterplotLayer',
+            df,
+            get_position='[lon, lat]',
+            get_color='[color_r, color_g, color_b, 200]',
+            get_radius=250,
+            pickable=True
+        )
+
+        st.pydeck_chart(pdk.Deck(
+            map_style='mapbox://styles/mapbox/light-v9',
+            initial_view_state=view_state,
+            layers=[layer],
+            tooltip={"text": "{name}"}
+        ))
+
+
+update_dynamic_content()
 st.title("Forest of St-Germain")
-update_map(warning_update)
+
+
+#auto-refresh (Optionnal: force le rechargement toutes les 5s)
+time.sleep(5)
+st.rerun())
